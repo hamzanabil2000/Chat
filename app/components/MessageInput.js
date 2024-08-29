@@ -6,7 +6,7 @@ import {
   uploadBytesResumable,
   getDownloadURL,
 } from "firebase/storage";
-import { app } from "@/lib/firebase";
+import { app } from "@/lib/firebase"; // Import Realtime Database
 import EmojiPicker from "emoji-picker-react";
 
 function MessageInput({ sendMessage, message, setMessage, image, setImage }) {
@@ -15,7 +15,7 @@ function MessageInput({ sendMessage, message, setMessage, image, setImage }) {
   const [imagePreview, setImagePreview] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  // Initialize storage object
+  // Initialize storage and database object
   const storage = getStorage(app);
 
   const handleFileChange = (e) => {

@@ -1,25 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import MessageCard from "./MessageCard";
 import MessageInput from "./MessageInput";
-import {
-  addDoc,
-  collection,
-  doc,
-  serverTimestamp,
-  onSnapshot,
-  query,
-  where,
-  orderBy,
-  updateDoc,
-} from "firebase/firestore";
-import { firestore } from "@/lib/firebase";
+import { ref, onValue, push, serverTimestamp, update } from "firebase/database";
+import { database } from "@/lib/firebase"; // Updated import
 
 function ChatRoom({ user, selectedChatroom }) {
   const me = selectedChatroom?.myData;
   const other = selectedChatroom?.otherData;
   const chatRoomId = selectedChatroom?.id;
 
-  const [message, setMessage] = useState([]);
+  const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const messagesContainerRef = useRef(null);
   const [image, setImage] = useState(null);
@@ -32,58 +22,57 @@ function ChatRoom({ user, selectedChatroom }) {
     }
   }, [messages]);
 
-  //get messages
+  // Get messages
   useEffect(() => {
     if (!chatRoomId) return;
-    const unsubscribe = onSnapshot(
-      query(
-        collection(firestore, "messages"),
-        where("chatRoomId", "==", chatRoomId),
-        orderBy("time", "asc")
-      ),
-      (snapshot) => {
-        const messages = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        //console.log(messages);
-        setMessages(messages);
-      }
-    );
 
-    return unsubscribe;
+    const messagesRef = ref(database, `messages/${chatRoomId}`);
+
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const messagesData = snapshot.val();
+      const messagesArray = messagesData
+        ? Object.keys(messagesData).map((key) => ({
+            id: key,
+            ...messagesData[key],
+          }))
+        : [];
+      setMessages(messagesArray);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [chatRoomId]);
 
   console.log(messages);
 
-  //put messages in db
+  // Send message
   const sendMessage = async () => {
-    const messagesCollection = collection(firestore, "messages");
+    const messagesRef = ref(database, `messages/${chatRoomId}`);
     // Check if the message is not empty
-    if (message == "" && image == "") {
+    if (message === "" && !image) {
       return;
     }
 
     try {
-      // Add a new message to the Firestore collection
+      // Add a new message to the Realtime Database
       const newMessage = {
         chatRoomId: chatRoomId,
         sender: me.id,
         content: message,
         time: serverTimestamp(),
-        image: image,
+        image: image || null,
       };
 
-      await addDoc(messagesCollection, newMessage);
+      await push(messagesRef, newMessage);
       setMessage("");
       setImage("");
-      //send to chatroom by chatroom id and update last message
-      const chatroomRef = doc(firestore, "chatrooms", chatRoomId);
-      await updateDoc(chatroomRef, {
+
+      // Update the last message in the chatroom
+      const chatroomRef = ref(database, `chatrooms/${chatRoomId}`);
+      await update(chatroomRef, {
         lastMessage: message ? message : "Image",
       });
-
-      // Clear the input field after sending the message
     } catch (error) {
       console.error("Error sending message:", error.message);
     }

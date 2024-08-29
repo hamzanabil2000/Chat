@@ -1,8 +1,8 @@
 "use client";
 
-import { app, firestore } from "@/lib/firebase";
+import { app } from "@/lib/firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { getDatabase, ref, get } from "firebase/database";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Users from "./components/Users";
@@ -10,6 +10,7 @@ import ChatRoom from "./components/ChatRoom";
 
 export default function Home() {
   const auth = getAuth(app);
+  const db = getDatabase(app); // Initialize Realtime Database
   const [user, setUser] = useState(null);
   const router = useRouter();
   const [selectedChatroom, setSelectedChatroom] = useState(null);
@@ -18,13 +19,13 @@ export default function Home() {
     // Use onAuthStateChanged to listen for changes in authentication state
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const docRef = doc(firestore, "users", user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = { id: docSnap.id, ...docSnap.data() };
+        const userRef = ref(db, `users/${user.uid}`); // Reference to the user in the Realtime Database
+        const snapshot = await get(userRef); // Get the user data from the Realtime Database
+        if (snapshot.exists()) {
+          const data = { id: snapshot.key, ...snapshot.val() };
           setUser(data);
         } else {
-          console.log("No such document!");
+          console.log("No such user data in Realtime Database!");
         }
       } else {
         setUser(null);
@@ -32,11 +33,11 @@ export default function Home() {
       }
     });
     return () => unsubscribe();
-  }, [auth, router]);
+  }, [auth, db, router]);
 
-  if (user == null) {
-    return <div className="text-4xl">Loading...</div>;
-  }
+  // if (user == null) {
+  //   return <div className="text-4xl">Loading...</div>;
+  // }
 
   return (
     <div className="flex h-screen overflow-hidden">

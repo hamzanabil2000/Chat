@@ -1,12 +1,13 @@
 "use client";
 
-import { auth, firestore } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { getDatabase, ref, set } from "firebase/database"; // Import Realtime Database functions
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AvatarGenerator } from "random-avatar-generator";
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 const page = () => {
   const [name, setName] = useState("");
@@ -63,9 +64,14 @@ const page = () => {
         );
         const user = userCredential.user;
 
-        // Now you can use the user's UID as the document ID
-        const docRef = doc(firestore, "users", user.uid);
-        await setDoc(docRef, {
+        // Initialize Realtime Database
+        const db = getDatabase();
+
+        // Create a reference to the user's data in the Realtime Database
+        const userRef = ref(db, `users/${user.uid}`);
+
+        // Set the user's data in the Realtime Database
+        await set(userRef, {
           name,
           email: email,
           avatarUrl,
@@ -100,7 +106,7 @@ const page = () => {
           <img
             src={avatarUrl}
             alt="Avatar"
-            className=" rounded-full h-20 w-20"
+            className="rounded-full h-20 w-20"
           />
           <button
             type="button"

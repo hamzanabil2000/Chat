@@ -5,10 +5,38 @@ function MessageCard({ message, me, other }) {
   const isMessageFromMe = message.sender === me.id;
 
   const formatTimeAgo = (timestamp) => {
-    const date = timestamp?.toDate();
+    let date;
+  
+    // Check if timestamp is a native Date object
+    if (timestamp instanceof Date) {
+      date = timestamp;
+    } 
+    // Check if timestamp has a toDate method (Firestore Timestamp)
+    else if (timestamp && typeof timestamp.toDate === 'function') {
+      date = timestamp.toDate();
+    } 
+    // Handle Unix timestamp in milliseconds
+    else if (typeof timestamp === 'number') {
+      date = new Date(timestamp);
+    } 
+    // Handle Unix timestamp in seconds (if applicable)
+    else if (typeof timestamp === 'string' && !isNaN(Number(timestamp))) {
+      date = new Date(Number(timestamp) * 1000);
+    } 
+    // Handle invalid timestamp
+    else {
+      console.error('Invalid timestamp format:', timestamp);
+      return 'Invalid time';
+    }
+  
+    // Format the date using moment.js
     const momentDate = moment(date);
-    return momentDate.fromNow();
+    return momentDate.isValid() ? momentDate.fromNow() : 'Invalid time';
   };
+  
+  
+  
+  
 
   return (
     <div
