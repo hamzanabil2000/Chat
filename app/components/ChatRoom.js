@@ -1,8 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import MessageCard from "./MessageCard";
 import MessageInput from "./MessageInput";
-import { ref, onValue, push, serverTimestamp, update } from "firebase/database";
-import { database } from "@/lib/firebase"; // Updated import
+import {
+  ref,
+  onValue,
+  push,
+  serverTimestamp,
+  update,
+  remove,
+} from "firebase/database";
+import { database } from "@/lib/firebase";
 
 function ChatRoom({ user, selectedChatroom }) {
   const me = selectedChatroom?.myData;
@@ -11,18 +18,17 @@ function ChatRoom({ user, selectedChatroom }) {
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-  const messagesContainerRef = useRef(null);
   const [image, setImage] = useState(null);
+  const [replyMessage, setReplyMessage] = useState(null);
+  const messagesContainerRef = useRef(null);
 
   useEffect(() => {
-    // Scroll to the bottom when messages change
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop =
         messagesContainerRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // Get messages
   useEffect(() => {
     if (!chatRoomId) return;
 
@@ -44,31 +50,27 @@ function ChatRoom({ user, selectedChatroom }) {
     };
   }, [chatRoomId]);
 
-  console.log(messages);
-
-  // Send message
   const sendMessage = async () => {
     const messagesRef = ref(database, `messages/${chatRoomId}`);
-    // Check if the message is not empty
     if (message === "" && !image) {
       return;
     }
 
     try {
-      // Add a new message to the Realtime Database
       const newMessage = {
         chatRoomId: chatRoomId,
         sender: me.id,
         content: message,
         time: serverTimestamp(),
         image: image || null,
+        parentMsgId: replyMessage ? replyMessage.id : null, // Include parent message ID
       };
 
       await push(messagesRef, newMessage);
       setMessage("");
       setImage("");
+      setReplyMessage(null); // Clear reply message
 
-      // Update the last message in the chatroom
       const chatroomRef = ref(database, `chatrooms/${chatRoomId}`);
       await update(chatroomRef, {
         lastMessage: message ? message : "Image",
@@ -77,16 +79,30 @@ function ChatRoom({ user, selectedChatroom }) {
       console.error("Error sending message:", error.message);
     }
 
-    // Scroll to the bottom after sending a message
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop =
         messagesContainerRef.current.scrollHeight;
     }
   };
 
+  const handleReply = (message) => {
+    setReplyMessage(message);
+  };
+
+  const handleDelete = async (messageId) => {
+    try {
+      await remove(ref(database, `messages/${chatRoomId}/${messageId}`));
+    } catch (error) {
+      console.error("Error deleting message:", error.message);
+    }
+  };
+
+  const handleClearReply = () => {
+    setReplyMessage(null);
+  };
+
   return (
     <div className="flex flex-col h-screen">
-      {/* Messages container with overflow and scroll */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-10">
         {messages?.map((message) => (
           <MessageCard
@@ -94,11 +110,29 @@ function ChatRoom({ user, selectedChatroom }) {
             message={message}
             me={me}
             other={other}
+            onReply={handleReply}
+            onDelete={handleDelete}
+            messages={messages}
           />
         ))}
       </div>
 
-      {/* Input box at the bottom */}
+      {replyMessage && (
+        <div className="bg-gray-200 p-5 border-b border-gray-300">
+          <p className="text-gray-600">Replying to:</p>
+          <MessageCard
+            message={replyMessage}
+            me={me}
+            other={other}
+            onReply={handleReply}
+            onDelete={handleDelete}
+          />
+          <button onClick={handleClearReply} className="text-blue-500 mt-2">
+            Cancel Reply
+          </button>
+        </div>
+      )}
+
       <MessageInput
         sendMessage={sendMessage}
         message={message}
